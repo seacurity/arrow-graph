@@ -19,6 +19,7 @@ pub struct GraphChangeDetector {
     
     // Change tracking
     significant_changes: Vec<GraphChange>,
+    #[allow(dead_code)]
     change_sensitivity: f64,
 }
 

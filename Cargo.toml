@@ -1,6 +1,6 @@
 [package]
 name = "arrow-graph"
-version = "0.6.1"
+version = "0.6.2"
 edition = "2021"
 authors = ["Mike Saxton <mike@seacurity.io>"]
 description = "Arrow-native graph processing engine with SQL interface"

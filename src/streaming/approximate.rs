@@ -1,7 +1,6 @@
 use crate::error::Result;
 use crate::streaming::incremental::IncrementalGraphProcessor;
 use arrow::array::Array;
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 /// Approximate algorithms for large-scale graph analytics

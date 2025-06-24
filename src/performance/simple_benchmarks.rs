@@ -296,7 +296,7 @@ impl SimpleBenchmark {
         }
         
         let base_rank = (1.0 - damping_factor) / node_count as f64;
-        let base_rank_simd = f64x4::splat(base_rank);
+        let _base_rank_simd = f64x4::splat(base_rank);
         
         for iteration in 0..max_iterations {
             // SIMD reset of new_ranks (4 elements at a time)
@@ -559,12 +559,36 @@ mod tests {
     #[test]
     fn test_pagerank_benchmark() {
         let bench = SimpleBenchmark::new("test");
-        let mut graph = ArrowGraph::new();
         
-        // Add some test nodes
-        for i in 0..100 {
-            let _ = graph.add_node(&format!("node_{}", i), None);
-        }
+        // Create a simple test graph
+        use arrow::array::{StringArray, Float64Array};
+        use arrow::datatypes::{DataType, Field, Schema};
+        use arrow::record_batch::RecordBatch;
+        use std::sync::Arc;
+        
+        let nodes_schema = Arc::new(Schema::new(vec![
+            Field::new("id", DataType::Utf8, false),
+        ]));
+        let node_ids = StringArray::from(vec!["A", "B", "C"]);
+        let nodes_batch = RecordBatch::try_new(
+            nodes_schema,
+            vec![Arc::new(node_ids)],
+        ).unwrap();
+
+        let edges_schema = Arc::new(Schema::new(vec![
+            Field::new("source", DataType::Utf8, false),
+            Field::new("target", DataType::Utf8, false),
+            Field::new("weight", DataType::Float64, false),
+        ]));
+        let sources = StringArray::from(vec!["A", "B"]);
+        let targets = StringArray::from(vec!["B", "C"]);
+        let weights = Float64Array::from(vec![1.0, 1.0]);
+        let edges_batch = RecordBatch::try_new(
+            edges_schema,
+            vec![Arc::new(sources), Arc::new(targets), Arc::new(weights)],
+        ).unwrap();
+
+        let graph = ArrowGraph::new(nodes_batch, edges_batch).unwrap();
         
         let result = bench.bench_pagerank(&graph).unwrap();
         assert_eq!(result.name, "PageRank");

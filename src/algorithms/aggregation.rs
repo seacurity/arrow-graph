@@ -2,7 +2,7 @@ use arrow::record_batch::RecordBatch;
 use arrow::array::{StringArray, Float64Array, UInt64Array};
 use arrow::datatypes::{DataType, Field, Schema};
 use std::sync::Arc;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use crate::algorithms::{GraphAlgorithm, AlgorithmParams};
 use crate::graph::ArrowGraph;
 use crate::error::{GraphError, Result};
@@ -10,7 +10,7 @@ use crate::error::{GraphError, Result};
 pub struct GraphDensity;
 
 impl GraphAlgorithm for GraphDensity {
-    fn execute(&self, graph: &ArrowGraph, params: &AlgorithmParams) -> Result<RecordBatch> {
+    fn execute(&self, _graph: &ArrowGraph, _params: &AlgorithmParams) -> Result<RecordBatch> {
         todo!("Calculate graph density metric")
     }
     

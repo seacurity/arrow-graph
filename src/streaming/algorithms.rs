@@ -330,6 +330,7 @@ impl StreamingConnectedComponents {
     }
 
     /// Union-Find helper: find root with path compression
+    #[allow(dead_code)]
     fn find_root(&self, mut node: String, temp_parents: &mut HashMap<String, String>) -> String {
         let mut path = Vec::new();
         

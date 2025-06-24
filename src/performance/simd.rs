@@ -4,7 +4,7 @@ use arrow::array::{Array, Float64Array, UInt32Array, StringArray};
 use arrow::record_batch::RecordBatch;
 use std::collections::HashMap;
 use wide::{f64x4};
-// use aligned_vec::avec; // Not needed for this implementation
+use aligned_vec::avec;
 use rayon::prelude::*;
 
 /// SIMD-optimized graph operations for high-performance computing
@@ -106,8 +106,8 @@ impl SIMDGraphOps {
         let adjacency = self.build_simd_adjacency_matrix(graph)?;
         
         // Initialize PageRank values
-        let mut pr_current: Vec<f64> = (0..num_nodes).map(|_| 1.0 / num_nodes as f64).collect();
-        let mut pr_next: Vec<f64> = (0..num_nodes).map(|_| 0.0).collect();
+        let mut pr_current = AV::from_iter(64, (0..num_nodes).map(|_| 1.0 / num_nodes as f64));
+        let mut pr_next = AV::from_iter(64, (0..num_nodes).map(|_| 0.0));
         
         for _iteration in 0..iterations {
             self.simd_pagerank_iteration(&adjacency, &pr_current, &mut pr_next, damping, num_nodes)?;
@@ -126,9 +126,9 @@ impl SIMDGraphOps {
         let adjacency = self.build_simd_weighted_matrix(graph)?;
         
         // Initialize distances with infinity
-        let mut distances: Vec<f64> = (0..num_nodes).map(|i| {
+        let mut distances = AV::from_iter(64, (0..num_nodes).map(|i| {
             if i == source { 0.0 } else { f64::INFINITY }
-        }).collect();
+        }));
         
         let mut visited = vec![false; num_nodes];
         
@@ -179,8 +179,8 @@ impl SIMDGraphOps {
             changed = false;
             
             // Vectorized component propagation
-            for chunk_start in (0..num_nodes).step_by(4) {
-                let chunk_end = (chunk_start + 4).min(num_nodes);
+            for chunk_start in (0..num_nodes).step_by(8) {
+                let chunk_end = (chunk_start + 8).min(num_nodes);
                 if self.simd_propagate_components(&adjacency, &mut components, chunk_start, chunk_end)? {
                     changed = true;
                 }
@@ -212,11 +212,11 @@ impl SIMDGraphOps {
     /// Build SIMD-aligned adjacency matrix
     fn build_simd_adjacency_matrix(&self, graph: &ArrowGraph) -> Result<Vec<Vec<f64>>> {
         let num_nodes = graph.node_count();
-        let mut matrix: Vec<Vec<f64>> = Vec::with_capacity(num_nodes);
+        let mut matrix = Vec::with_capacity(num_nodes);
         
         // Initialize with aligned vectors
         for _ in 0..num_nodes {
-            matrix.push((0..num_nodes).map(|_| 0.0).collect());
+            matrix.push(AV::from_iter(64, (0..num_nodes).map(|_| 0.0)));
         }
         
         // Fill adjacency matrix from edges
@@ -262,13 +262,13 @@ impl SIMDGraphOps {
     }
 
     /// Build weighted adjacency matrix for shortest paths
-    fn build_simd_weighted_matrix(&self, graph: &ArrowGraph) -> Result<Vec<Vec<f64>>> {
+    fn build_simd_weighted_matrix(&self, graph: &ArrowGraph) -> Result<Vec<AV<f64>>> {
         let num_nodes = graph.node_count();
-        let mut matrix: Vec<Vec<f64>> = Vec::with_capacity(num_nodes);
+        let mut matrix = Vec::with_capacity(num_nodes);
         
         // Initialize with infinity (no connection)
         for _ in 0..num_nodes {
-            matrix.push((0..num_nodes).map(|_| f64::INFINITY).collect());
+            matrix.push(AV::from_iter(64, (0..num_nodes).map(|_| f64::INFINITY)));
         }
         
         // Set diagonal to 0 (distance to self)
@@ -326,9 +326,9 @@ impl SIMDGraphOps {
     /// SIMD PageRank iteration
     fn simd_pagerank_iteration(
         &self,
-        adjacency: &[Vec<f64>],
-        pr_current: &Vec<f64>,
-        pr_next: &mut Vec<f64>,
+        adjacency: &[AV<f64>],
+        pr_current: &AV<f64>,
+        pr_next: &mut AV<f64>,
         damping: f64,
         num_nodes: usize,
     ) -> Result<()> {
@@ -344,20 +344,28 @@ impl SIMDGraphOps {
                 let chunk_end = (chunk_start + chunk_size).min(num_nodes);
                 let chunk_len = chunk_end - chunk_start;
                 
-                if chunk_len >= 4 {
-                    // Full SIMD vector (f64x4)
-                    let adj_chunk = f64x4::new([
+                if chunk_len == 8 {
+                    // Full SIMD vector
+                    let adj_chunk = f64x8::new([
                         adjacency[chunk_start][i],
                         adjacency[chunk_start + 1][i],
                         adjacency[chunk_start + 2][i],
                         adjacency[chunk_start + 3][i],
+                        adjacency[chunk_start + 4][i],
+                        adjacency[chunk_start + 5][i],
+                        adjacency[chunk_start + 6][i],
+                        adjacency[chunk_start + 7][i],
                     ]);
                     
-                    let pr_chunk = f64x4::new([
+                    let pr_chunk = f64x8::new([
                         pr_current[chunk_start],
                         pr_current[chunk_start + 1],
                         pr_current[chunk_start + 2],
                         pr_current[chunk_start + 3],
+                        pr_current[chunk_start + 4],
+                        pr_current[chunk_start + 5],
+                        pr_current[chunk_start + 6],
+                        pr_current[chunk_start + 7],
                     ]);
                     
                     let product = adj_chunk * pr_chunk;
@@ -377,7 +385,7 @@ impl SIMDGraphOps {
     }
 
     /// SIMD find minimum distance
-    fn simd_find_minimum(&self, distances: &Vec<f64>, visited: &[bool]) -> Result<usize> {
+    fn simd_find_minimum(&self, distances: &AV<f64>, visited: &[bool]) -> Result<usize> {
         let mut min_dist = f64::INFINITY;
         let mut min_idx = 0;
         
@@ -395,8 +403,8 @@ impl SIMDGraphOps {
     /// SIMD neighbor relaxation for shortest paths
     fn simd_relax_neighbors(
         &self,
-        distances: &mut Vec<f64>,
-        adjacency: &[Vec<f64>],
+        distances: &mut AV<f64>,
+        adjacency: &[AV<f64>],
         current: usize,
         visited: &[bool],
     ) -> Result<()> {
@@ -408,25 +416,33 @@ impl SIMDGraphOps {
             let chunk_end = (chunk_start + chunk_size).min(distances.len());
             let chunk_len = chunk_end - chunk_start;
             
-            if chunk_len >= 4 {
+            if chunk_len == 8 {
                 // Load distances
-                let dist_chunk = f64x4::new([
+                let dist_chunk = f64x8::new([
                     distances[chunk_start],
                     distances[chunk_start + 1],
                     distances[chunk_start + 2],
                     distances[chunk_start + 3],
+                    distances[chunk_start + 4],
+                    distances[chunk_start + 5],
+                    distances[chunk_start + 6],
+                    distances[chunk_start + 7],
                 ]);
                 
                 // Load edge weights
-                let weight_chunk = f64x4::new([
+                let weight_chunk = f64x8::new([
                     adjacency[current][chunk_start],
                     adjacency[current][chunk_start + 1],
                     adjacency[current][chunk_start + 2],
                     adjacency[current][chunk_start + 3],
+                    adjacency[current][chunk_start + 4],
+                    adjacency[current][chunk_start + 5],
+                    adjacency[current][chunk_start + 6],
+                    adjacency[current][chunk_start + 7],
                 ]);
                 
                 // Compute new distances
-                let new_dist = f64x4::splat(current_dist) + weight_chunk;
+                let new_dist = f64x8::splat(current_dist) + weight_chunk;
                 
                 // Update if better and not visited
                 let updated = dist_chunk.min(new_dist);
@@ -457,7 +473,7 @@ impl SIMDGraphOps {
     /// SIMD triangle counting for a chunk
     fn simd_triangle_count_chunk(
         &self,
-        adjacency: &[Vec<f64>],
+        adjacency: &[AV<f64>],
         chunk_start: usize,
         chunk_end: usize,
     ) -> Result<u64> {
@@ -478,7 +494,7 @@ impl SIMDGraphOps {
     /// SIMD common neighbor counting
     fn simd_count_common_neighbors(
         &self,
-        adjacency: &[Vec<f64>],
+        adjacency: &[AV<f64>],
         node1: usize,
         node2: usize,
     ) -> Result<u64> {
@@ -486,23 +502,31 @@ impl SIMDGraphOps {
         let num_nodes = adjacency.len();
         
         // Vectorized common neighbor detection
-        for chunk_start in (0..num_nodes).step_by(4) {
-            let chunk_end = (chunk_start + 4).min(num_nodes);
+        for chunk_start in (0..num_nodes).step_by(8) {
+            let chunk_end = (chunk_start + 8).min(num_nodes);
             let chunk_len = chunk_end - chunk_start;
             
-            if chunk_len >= 4 {
-                let adj1_chunk = f64x4::new([
+            if chunk_len == 8 {
+                let adj1_chunk = f64x8::new([
                     adjacency[node1][chunk_start],
                     adjacency[node1][chunk_start + 1],
                     adjacency[node1][chunk_start + 2],
                     adjacency[node1][chunk_start + 3],
+                    adjacency[node1][chunk_start + 4],
+                    adjacency[node1][chunk_start + 5],
+                    adjacency[node1][chunk_start + 6],
+                    adjacency[node1][chunk_start + 7],
                 ]);
                 
-                let adj2_chunk = f64x4::new([
+                let adj2_chunk = f64x8::new([
                     adjacency[node2][chunk_start],
                     adjacency[node2][chunk_start + 1],
                     adjacency[node2][chunk_start + 2],
                     adjacency[node2][chunk_start + 3],
+                    adjacency[node2][chunk_start + 4],
+                    adjacency[node2][chunk_start + 5],
+                    adjacency[node2][chunk_start + 6],
+                    adjacency[node2][chunk_start + 7],
                 ]);
                 
                 // Element-wise AND (both > 0)
@@ -530,7 +554,7 @@ impl SIMDGraphOps {
     /// SIMD component propagation
     fn simd_propagate_components(
         &self,
-        adjacency: &[Vec<f64>],
+        adjacency: &[AV<f64>],
         components: &mut [u32],
         chunk_start: usize,
         chunk_end: usize,
@@ -575,7 +599,7 @@ impl SIMDGraphOps {
     /// SIMD clustering coefficient for a chunk
     fn simd_clustering_chunk(
         &self,
-        adjacency: &[Vec<f64>],
+        adjacency: &[AV<f64>],
         nodes: &[usize],
     ) -> Result<Vec<f64>> {
         let mut coefficients = Vec::with_capacity(nodes.len());
@@ -589,7 +613,7 @@ impl SIMDGraphOps {
     }
 
     /// SIMD clustering coefficient for a single node
-    fn simd_node_clustering_coefficient(&self, adjacency: &[Vec<f64>], node: usize) -> Result<f64> {
+    fn simd_node_clustering_coefficient(&self, adjacency: &[AV<f64>], node: usize) -> Result<f64> {
         // Get neighbors
         let mut neighbors = Vec::new();
         for (i, &connected) in adjacency[node].iter().enumerate() {

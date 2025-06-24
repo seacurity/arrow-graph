@@ -1,5 +1,5 @@
 use arrow::record_batch::RecordBatch;
-use arrow::array::{StringArray, Float64Array, UInt32Array};
+use arrow::array::{StringArray, Float64Array};
 use arrow::datatypes::{DataType, Field, Schema};
 use std::sync::Arc;
 use std::collections::HashMap;

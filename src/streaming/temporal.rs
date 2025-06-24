@@ -10,6 +10,7 @@ pub struct SlidingWindowProcessor {
     window_size: std::time::Duration,
     max_snapshots: usize,
     snapshots: VecDeque<GraphSnapshot>,
+    #[allow(dead_code)]
     current_metrics: HashMap<String, f64>,
 }
 

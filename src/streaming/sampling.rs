@@ -34,6 +34,7 @@ pub struct NodeSampler {
     rng: Pcg64,
     config: SamplingConfig,
     sampled_nodes: HashSet<String>,
+    #[allow(dead_code)]
     node_scores: HashMap<String, f64>, // Scores for importance-based sampling
 }
 
@@ -84,7 +85,7 @@ impl NodeSampler {
 
     /// Degree-based importance sampling (higher degree = higher probability)
     pub fn degree_based_sample(&mut self, processor: &IncrementalGraphProcessor) -> Result<HashSet<String>> {
-        let graph = processor.graph();
+        let _graph = processor.graph();
         let degree_map = self.calculate_node_degrees(processor)?;
         
         // Calculate sampling probabilities based on degree
@@ -119,7 +120,7 @@ impl NodeSampler {
     }
 
     /// PageRank-based importance sampling
-    pub fn pagerank_based_sample(&mut self, processor: &IncrementalGraphProcessor, pagerank_scores: &HashMap<String, f64>) -> Result<HashSet<String>> {
+    pub fn pagerank_based_sample(&mut self, _processor: &IncrementalGraphProcessor, pagerank_scores: &HashMap<String, f64>) -> Result<HashSet<String>> {
         // Calculate sampling probabilities based on PageRank scores
         let total_score: f64 = pagerank_scores.values().sum();
         let mut cumulative_probs = Vec::new();
@@ -347,7 +348,7 @@ impl SubgraphSampler {
 
     /// Random walk sampling starting from a random node
     pub fn random_walk_sample(&mut self, processor: &IncrementalGraphProcessor, walk_length: usize) -> Result<SampledSubgraph> {
-        let graph = processor.graph();
+        let _graph = processor.graph();
         let adjacency = self.build_adjacency_list(processor)?;
         
         // Get all nodes

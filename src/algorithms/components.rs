@@ -103,6 +103,7 @@ impl UnionFind {
         components
     }
     
+    #[allow(dead_code)]
     fn component_count(&mut self) -> usize {
         self.get_components().len()
     }

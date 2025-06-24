@@ -65,38 +65,37 @@ impl GraphIndexes {
             for i in 0..edges.num_rows() {
                 let source_opt = source_array.value(i);
                 let target_opt = target_array.value(i);
-                if let (source, target) = (source_opt, target_opt) {
-                    let source_str = source.to_string();
-                    let target_str = target.to_string();
-                    
-                    // Add to adjacency lists (create nodes if they don't exist)
-                    adjacency_list.entry(source_str.clone())
-                        .or_default()
-                        .push(target_str.clone());
-                    
-                    reverse_adjacency_list.entry(target_str.clone())
-                        .or_default()
-                        .push(source_str.clone());
-                    
-                    // Add to node index if not exists
-                    if !node_index.contains_key(&source_str) {
-                        let idx = node_index.len();
-                        node_index.insert(source_str.clone(), idx);
-                    }
-                    if !node_index.contains_key(&target_str) {
-                        let idx = node_index.len();
-                        node_index.insert(target_str.clone(), idx);
-                    }
-                    
-                    // Handle edge weights
-                    let weight = if let Some(weights) = weight_array {
-                        weights.value(i)
-                    } else {
-                        1.0 // Default weight
-                    };
-                    
-                    edge_weights.insert((source_str, target_str), weight);
+                let (source, target) = (source_opt, target_opt);
+                let source_str = source.to_string();
+                let target_str = target.to_string();
+                
+                // Add to adjacency lists (create nodes if they don't exist)
+                adjacency_list.entry(source_str.clone())
+                    .or_default()
+                    .push(target_str.clone());
+                
+                reverse_adjacency_list.entry(target_str.clone())
+                    .or_default()
+                    .push(source_str.clone());
+                
+                // Add to node index if not exists
+                if !node_index.contains_key(&source_str) {
+                    let idx = node_index.len();
+                    node_index.insert(source_str.clone(), idx);
                 }
+                if !node_index.contains_key(&target_str) {
+                    let idx = node_index.len();
+                    node_index.insert(target_str.clone(), idx);
+                }
+                
+                // Handle edge weights
+                let weight = if let Some(weights) = weight_array {
+                    weights.value(i)
+                } else {
+                    1.0 // Default weight
+                };
+                
+                edge_weights.insert((source_str, target_str), weight);
             }
         }
         

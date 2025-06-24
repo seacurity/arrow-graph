@@ -49,7 +49,7 @@ impl RecursiveCteProcessor {
     ) -> DataFusionResult<Vec<GraphPath>> {
         let mut paths = Vec::new();
         let mut queue = VecDeque::new();
-        let mut visited_in_path = HashSet::new();
+        let visited_in_path = HashSet::new();
 
         // Build adjacency map for efficient lookup
         let mut adjacency_map: HashMap<String, Vec<(String, f64)>> = HashMap::new();
@@ -68,7 +68,7 @@ impl RecursiveCteProcessor {
         };
         queue.push_back((initial_path, visited_in_path.clone()));
 
-        while let Some((current_path, mut path_visited)) = queue.pop_front() {
+        while let Some((current_path, path_visited)) = queue.pop_front() {
             // Check if we've reached the target (if specified)
             if let Some(target) = end_node {
                 if current_path.nodes.last() == Some(&target.to_string()) {

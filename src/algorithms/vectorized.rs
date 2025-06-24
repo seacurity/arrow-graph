@@ -223,7 +223,7 @@ impl VectorizedDistanceCalculator {
         // Floyd-Warshall algorithm with vectorized operations
         for k in 0..node_count {
             // Create Arrow arrays for the k-th row and column
-            let k_row = Float64Array::from(distances[k].clone());
+            let _k_row = Float64Array::from(distances[k].clone());
             
             for i in 0..node_count {
                 if distances[i][k] == f64::INFINITY {

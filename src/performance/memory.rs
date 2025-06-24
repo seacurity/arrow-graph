@@ -536,7 +536,7 @@ impl MemoryPool {
     }
 
     /// Deallocate memory back to pool
-    pub fn deallocate(&mut self, ptr: NonNull<u8>, size: usize) {
+    pub fn deallocate(&self, ptr: NonNull<u8>, size: usize) {
         let aligned_size = self.align_size(size);
         
         // Return to pool if not full

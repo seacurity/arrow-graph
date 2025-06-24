@@ -1,5 +1,5 @@
 use arrow::record_batch::RecordBatch;
-use arrow::array::{StringArray, UInt32Array, Float64Array};
+use arrow::array::{StringArray, UInt32Array};
 use arrow::datatypes::{DataType, Field, Schema};
 use std::sync::Arc;
 use std::collections::{HashMap, HashSet};
@@ -10,7 +10,7 @@ use crate::error::{GraphError, Result};
 pub struct LouvainCommunityDetection;
 
 impl GraphAlgorithm for LouvainCommunityDetection {
-    fn execute(&self, graph: &ArrowGraph, params: &AlgorithmParams) -> Result<RecordBatch> {
+    fn execute(&self, _graph: &ArrowGraph, _params: &AlgorithmParams) -> Result<RecordBatch> {
         todo!("Implement Louvain community detection algorithm")
     }
     
@@ -32,7 +32,7 @@ impl LeidenCommunityDetection {
         graph: &ArrowGraph,
         resolution: f64,
         max_iterations: usize,
-        seed: Option<u64>,
+        _seed: Option<u64>,
     ) -> Result<HashMap<String, u32>> {
         let node_ids: Vec<String> = graph.node_ids().cloned().collect();
         let node_count = node_ids.len();

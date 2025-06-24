@@ -69,8 +69,8 @@ impl StreamingGraphProcessor {
     /// Apply a streaming update to the graph
     pub fn apply_update(&mut self, update: StreamUpdate) -> Result<UpdateResult> {
         let start_time = std::time::Instant::now();
-        let initial_node_count = self.graph.node_count();
-        let initial_edge_count = self.graph.edge_count();
+        let _initial_node_count = self.graph.node_count();
+        let _initial_edge_count = self.graph.edge_count();
 
         // Log the update if enabled
         if self.enable_change_log {

@@ -1,7 +1,4 @@
-use arrow::array::*;
-use datafusion_common::{Result as DataFusionResult, ScalarValue};
-use datafusion_expr::{ColumnarValue, ScalarUDF, Signature, Volatility};
-use std::sync::Arc;
+use datafusion_expr::ScalarUDF;
 
 pub fn shortest_path_udf() -> ScalarUDF {
     todo!("Create shortest_path SQL function")
