@@ -13,6 +13,25 @@ Arrow-Graph brings graph analytics to the Apache Arrow ecosystem, providing:
 - **Streaming support** - Process large graphs with bounded memory
 - **ML-ready** - Built for graph neural networks and feature extraction
 
+### Graph Model
+
+Arrow-Graph represents graphs as Arrow RecordBatches, enabling zero-copy operations:
+
+```
+Edges Table (RecordBatch):
+┌───────┬────────┬────────┐
+│ src   │ dst    │ weight │
+├───────┼────────┼────────┤
+│ "A"   │ "B"    │ 1.0    │
+│ "B"   │ "C"    │ 2.0    │
+│ "C"   │ "D"    │ 1.5    │
+│ "A"   │ "D"    │ 3.0    │
+└───────┴────────┴────────┘
+
+Nodes: Automatically indexed from unique src/dst values
+Internal ID mapping: "A"→0, "B"→1, "C"→2, "D"→3
+```
+
 ## Quick Start
 
 ### Installation
@@ -55,6 +74,8 @@ println!("A connects to: {:?}", neighbors);
 
 ### SQL Interface (Coming in v0.3.0)
 
+Built as DataFusion User-Defined Functions (UDFs) for seamless integration:
+
 ```sql
 -- Find shortest paths
 SELECT shortest_path('A', 'D', 'edges_table') as path;
@@ -66,6 +87,23 @@ FROM nodes_table;
 -- Detect communities  
 SELECT node_id, community_detection('leiden', 'edges_table') as cluster
 FROM nodes_table;
+```
+
+**Current prototype** (basic graph metrics available):
+```rust
+// Register UDF with DataFusion
+ctx.register_udf(create_udf(
+    "graph_density",
+    vec![DataType::Utf8], // table name
+    Arc::new(DataType::Float64),
+    Volatility::Stable,
+    Arc::new(|args| {
+        let edges = get_edges_table(args[0].as_ref())?;
+        Ok(ColumnarValue::Scalar(ScalarValue::Float64(
+            Some(calculate_density(&edges)?)
+        )))
+    }),
+));
 ```
 
 ## Features
@@ -93,10 +131,36 @@ FROM nodes_table;
 ## Performance
 
 Built for modern data scales:
-- **Target**: 10-100x faster than NetworkX
+- **Target**: 10-100x faster than NetworkX (based on initial benchmarks with 1M edge datasets)
 - **Scale**: Handle 100M+ edges on single machine
 - **Memory**: Efficient columnar storage with zero-copy operations
 - **SIMD**: Vectorized algorithms using Arrow compute kernels
+
+*Comprehensive benchmarks coming in v0.2.0 release*
+
+## Use Cases
+
+Arrow-Graph is designed for modern graph analytics workflows:
+
+### Social Network Analysis
+- **Friend recommendations**: Find mutual connections and suggest new relationships
+- **Influence measurement**: Calculate centrality metrics for key opinion leaders
+- **Community detection**: Identify clusters and groups within social networks
+
+### Fraud Detection
+- **Transaction networks**: Analyze payment flows to detect suspicious patterns
+- **Account linking**: Find connected accounts through shared attributes
+- **Risk scoring**: Calculate graph-based features for ML fraud models
+
+### Knowledge Graphs & Recommendation Systems
+- **Product recommendations**: Graph-based collaborative filtering
+- **Content discovery**: Find related articles, papers, or media through citation/reference networks
+- **Semantic search**: Navigate knowledge graphs for enhanced search results
+
+### ML/AI Feature Engineering
+- **GNN preprocessing**: Prepare graph data for PyTorch Geometric or DGL
+- **Graph embeddings**: Calculate node2vec, GraphSAGE features at scale
+- **Pipeline integration**: Seamless integration with existing ML workflows via Arrow
 
 ## Architecture
 
