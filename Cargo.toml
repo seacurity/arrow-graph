@@ -1,0 +1,74 @@
+[package]
+name = "arrow-graph"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "Arrow-native graph processing engine with SQL interface"
+license = "Apache-2.0"
+repository = "https://github.com/yourusername/arrow-graph"
+keywords = ["graph", "analytics", "arrow", "sql", "datafusion"]
+categories = ["algorithms", "database"]
+
+[dependencies]
+# Core Arrow and DataFusion
+arrow = "53"
+arrow-array = "53"
+arrow-schema = "53"
+datafusion = "42"
+datafusion-expr = "42"
+datafusion-common = "42"
+datafusion-execution = "42"
+datafusion-physical-expr = "42"
+
+# Async and parallelism
+tokio = { version = "1.0", features = ["full"] }
+rayon = "1.8"
+
+# Graph algorithms reference
+petgraph = "0.6"
+
+# Serialization and errors
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging
+log = "0.4"
+env_logger = "0.11"
+
+# CLI support
+clap = { version = "4.0", features = ["derive"] }
+
+# Hash maps and collections
+hashbrown = "0.14"
+indexmap = "2.0"
+
+# Numeric computations
+num-traits = "0.2"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+tempfile = "3.0"
+pretty_assertions = "1.4"
+
+[[bench]]
+name = "graph_benchmarks"
+harness = false
+
+[[bin]]
+name = "arrow-graph-cli"
+path = "src/bin/main.rs"
+
+[lib]
+name = "arrow_graph"
+path = "src/lib.rs"
+
+[features]
+default = ["python"]
+python = ["pyo3"]
+
+[dependencies.pyo3]
+version = "0.21"
+features = ["extension-module"]
+optional = true
