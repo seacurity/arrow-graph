@@ -3,9 +3,9 @@ pub mod sql;
 pub mod algorithms;
 pub mod error;
 pub mod streaming;
-// TODO: Fix compilation errors in ML module
-// pub mod ml;
+pub mod ml;
 pub mod performance;
+pub mod analytics; // New advanced analytics module for v0.7.0
 
 pub use graph::{ArrowGraph, GraphIndexes, StreamingGraphProcessor, StreamingGraphSystem, StreamUpdate, UpdateResult, IncrementalAlgorithmProcessor};
 pub use sql::GraphSqlExtension;
@@ -18,6 +18,12 @@ pub use algorithms::centrality::{PageRank, BetweennessCentrality, EigenvectorCen
 pub use algorithms::vectorized::{VectorizedPageRank, VectorizedDistanceCalculator, VectorizedBatchOperations};
 pub use algorithms::sampling::{RandomWalk, Node2VecWalk, GraphSampling};
 pub use error::{GraphError, Result};
+// v0.7.0 Advanced Analytics Exports
+pub use analytics::{
+    AdvancedAnalyticsEngine, AnalyticsConfig,
+    TemporalAnalyzer, GraphNeuralNetwork, AdvancedMLPipeline,
+    GraphForecaster, GraphStatistics, AutoFeatureEngineering
+};
 
 pub mod prelude {
     pub use crate::graph::{ArrowGraph, GraphIndexes, StreamingGraphProcessor, StreamingGraphSystem, StreamUpdate, UpdateResult, IncrementalAlgorithmProcessor};
@@ -31,4 +37,10 @@ pub mod prelude {
     pub use crate::algorithms::vectorized::{VectorizedPageRank, VectorizedDistanceCalculator, VectorizedBatchOperations};
     pub use crate::algorithms::sampling::{RandomWalk, Node2VecWalk, GraphSampling};
     pub use crate::error::{GraphError, Result};
+    // v0.7.0 Advanced Analytics in Prelude
+    pub use crate::analytics::{
+        AdvancedAnalyticsEngine, AnalyticsConfig,
+        TemporalAnalyzer, GraphNeuralNetwork, AdvancedMLPipeline,
+        GraphForecaster, GraphStatistics, AutoFeatureEngineering
+    };
 }

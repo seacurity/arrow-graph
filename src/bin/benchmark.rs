@@ -3,7 +3,7 @@ use arrow_graph::performance::{run_all_benchmarks, print_results};
 use std::time::Instant;
 
 fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    println!("Arrow Graph v0.6.2 Performance Benchmark Suite");
+    println!("Arrow Graph v0.7.0 Performance Benchmark Suite");
     println!("==============================================");
 
     // Create a test graph for benchmarking
