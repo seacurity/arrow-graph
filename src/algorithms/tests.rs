@@ -1,10 +1,13 @@
 #[cfg(test)]
 mod tests {
     use crate::algorithms::pathfinding::{ShortestPath, AllPaths};
-    use crate::algorithms::centrality::PageRank;
+    use crate::algorithms::centrality::{PageRank, BetweennessCentrality, EigenvectorCentrality, ClosenessCentrality};
     use crate::algorithms::components::{WeaklyConnectedComponents, StronglyConnectedComponents};
     use crate::algorithms::community::LeidenCommunityDetection;
     use crate::algorithms::aggregation::{TriangleCount, ClusteringCoefficient};
+    use crate::algorithms::vectorized::{VectorizedPageRank, VectorizedBatchOperations};
+    use crate::algorithms::sampling::{RandomWalk, Node2VecWalk, GraphSampling};
+    use crate::graph::{StreamingGraphProcessor, StreamingGraphSystem, StreamUpdate};
     use crate::{GraphAlgorithm, AlgorithmParams};
     use crate::ArrowGraph;
     use arrow::record_batch::RecordBatch;
@@ -616,10 +619,125 @@ mod tests {
     }
 
     #[test]
-    fn test_algorithm_names_with_aggregation() {
+    fn test_betweenness_centrality() {
+        let graph = create_test_graph();
+        let algorithm = BetweennessCentrality;
+        
+        let params = AlgorithmParams::new();
+        let result = algorithm.execute(&graph, &params).unwrap();
+        
+        assert_eq!(result.num_rows(), graph.node_count());
+        assert_eq!(result.num_columns(), 2);
+        
+        let node_col = result.column(0).as_any().downcast_ref::<StringArray>().unwrap();
+        let centrality_col = result.column(1).as_any().downcast_ref::<Float64Array>().unwrap();
+        
+        // Verify all nodes are present and centrality values are non-negative
+        let mut found_nodes = std::collections::HashSet::new();
+        for i in 0..result.num_rows() {
+            let node_id = node_col.value(i);
+            let centrality = centrality_col.value(i);
+            
+            found_nodes.insert(node_id);
+            assert!(centrality >= 0.0, "Betweenness centrality should be non-negative: {}", centrality);
+        }
+        
+        assert!(found_nodes.contains("A"));
+        assert!(found_nodes.contains("B"));
+        assert!(found_nodes.contains("C"));
+        assert!(found_nodes.contains("D"));
+        assert!(found_nodes.contains("E"));
+    }
+
+    #[test]
+    fn test_eigenvector_centrality() {
+        let graph = create_test_graph();
+        let algorithm = EigenvectorCentrality;
+        
+        let params = AlgorithmParams::new()
+            .with_param("max_iterations", 50)
+            .with_param("tolerance", 1e-6);
+        
+        let result = algorithm.execute(&graph, &params).unwrap();
+        
+        assert_eq!(result.num_rows(), graph.node_count());
+        assert_eq!(result.num_columns(), 2);
+        
+        let node_col = result.column(0).as_any().downcast_ref::<StringArray>().unwrap();
+        let centrality_col = result.column(1).as_any().downcast_ref::<Float64Array>().unwrap();
+        
+        // Verify all nodes are present and centrality values are non-negative
+        let mut found_nodes = std::collections::HashSet::new();
+        for i in 0..result.num_rows() {
+            let node_id = node_col.value(i);
+            let centrality = centrality_col.value(i);
+            
+            found_nodes.insert(node_id);
+            assert!(centrality >= 0.0, "Eigenvector centrality should be non-negative: {}", centrality);
+        }
+        
+        assert!(found_nodes.contains("A"));
+        assert!(found_nodes.contains("B"));
+        assert!(found_nodes.contains("C"));
+        assert!(found_nodes.contains("D"));
+        assert!(found_nodes.contains("E"));
+    }
+
+    #[test]
+    fn test_closeness_centrality() {
+        let graph = create_test_graph();
+        let algorithm = ClosenessCentrality;
+        
+        let params = AlgorithmParams::new();
+        let result = algorithm.execute(&graph, &params).unwrap();
+        
+        assert_eq!(result.num_rows(), graph.node_count());
+        assert_eq!(result.num_columns(), 2);
+        
+        let node_col = result.column(0).as_any().downcast_ref::<StringArray>().unwrap();
+        let centrality_col = result.column(1).as_any().downcast_ref::<Float64Array>().unwrap();
+        
+        // Verify all nodes are present and centrality values are non-negative
+        let mut found_nodes = std::collections::HashSet::new();
+        for i in 0..result.num_rows() {
+            let node_id = node_col.value(i);
+            let centrality = centrality_col.value(i);
+            
+            found_nodes.insert(node_id);
+            assert!(centrality >= 0.0, "Closeness centrality should be non-negative: {}", centrality);
+        }
+        
+        assert!(found_nodes.contains("A"));
+        assert!(found_nodes.contains("B"));
+        assert!(found_nodes.contains("C"));
+        assert!(found_nodes.contains("D"));
+        assert!(found_nodes.contains("E"));
+    }
+
+    #[test]
+    fn test_centrality_invalid_params() {
+        let graph = create_test_graph();
+        
+        // Test eigenvector centrality with invalid parameters
+        let algorithm = EigenvectorCentrality;
+        
+        let params = AlgorithmParams::new().with_param("max_iterations", 0);
+        let result = algorithm.execute(&graph, &params);
+        assert!(result.is_err());
+        
+        let params = AlgorithmParams::new().with_param("tolerance", -1.0);
+        let result = algorithm.execute(&graph, &params);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_algorithm_names_with_centrality() {
         let shortest_path = ShortestPath;
         let all_paths = AllPaths;
         let pagerank = PageRank;
+        let betweenness = BetweennessCentrality;
+        let eigenvector = EigenvectorCentrality;
+        let closeness = ClosenessCentrality;
         let weakly_connected = WeaklyConnectedComponents;
         let strongly_connected = StronglyConnectedComponents;
         let leiden = LeidenCommunityDetection;
@@ -629,10 +747,721 @@ mod tests {
         assert_eq!(shortest_path.name(), "shortest_path");
         assert_eq!(all_paths.name(), "all_paths");
         assert_eq!(pagerank.name(), "pagerank");
+        assert_eq!(betweenness.name(), "betweenness_centrality");
+        assert_eq!(eigenvector.name(), "eigenvector_centrality");
+        assert_eq!(closeness.name(), "closeness_centrality");
         assert_eq!(weakly_connected.name(), "weakly_connected_components");
         assert_eq!(strongly_connected.name(), "strongly_connected_components");
         assert_eq!(leiden.name(), "leiden");
         assert_eq!(triangle_count.name(), "triangle_count");
         assert_eq!(clustering.name(), "clustering_coefficient");
+    }
+
+    #[test]
+    fn test_graph_mutations_add_node() {
+        let mut graph = create_test_graph();
+        let initial_count = graph.node_count();
+        
+        // Add a new node
+        graph.add_node("F".to_string()).unwrap();
+        
+        assert_eq!(graph.node_count(), initial_count + 1);
+        assert!(graph.has_node("F"));
+        
+        // Try to add duplicate node (should fail)
+        let result = graph.add_node("F".to_string());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_graph_mutations_remove_node() {
+        let mut graph = create_test_graph();
+        let initial_count = graph.node_count();
+        let initial_edge_count = graph.edge_count();
+        
+        // Remove a node (this should also remove its edges)
+        graph.remove_node("A").unwrap();
+        
+        assert_eq!(graph.node_count(), initial_count - 1);
+        assert!(!graph.has_node("A"));
+        assert!(graph.edge_count() < initial_edge_count); // Some edges removed
+        
+        // Try to remove non-existent node (should fail)
+        let result = graph.remove_node("Z");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_graph_mutations_add_edge() {
+        let mut graph = create_test_graph();
+        let initial_edge_count = graph.edge_count();
+        
+        // Add a new edge between existing nodes
+        graph.add_edge("A".to_string(), "E".to_string(), Some(2.5)).unwrap();
+        
+        assert_eq!(graph.edge_count(), initial_edge_count + 1);
+        assert_eq!(graph.edge_weight("A", "E"), Some(2.5));
+        
+        // Add edge with new nodes
+        graph.add_edge("F".to_string(), "G".to_string(), None).unwrap();
+        assert!(graph.has_node("F"));
+        assert!(graph.has_node("G"));
+        
+        // Try to add duplicate edge (should fail)
+        let result = graph.add_edge("A".to_string(), "E".to_string(), Some(1.0));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_graph_mutations_remove_edge() {
+        let mut graph = create_test_graph();
+        let initial_edge_count = graph.edge_count();
+        
+        // Remove an existing edge
+        graph.remove_edge("A", "B").unwrap();
+        
+        assert_eq!(graph.edge_count(), initial_edge_count - 1);
+        assert!(graph.edge_weight("A", "B").is_none());
+        
+        // Try to remove non-existent edge (should fail)
+        let result = graph.remove_edge("A", "Z");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_graph_mutations_complex_operations() {
+        let mut graph = create_test_graph();
+        
+        // Complex sequence of operations
+        graph.add_node("F".to_string()).unwrap();
+        graph.add_edge("F".to_string(), "A".to_string(), Some(3.0)).unwrap();
+        graph.add_edge("B".to_string(), "F".to_string(), Some(1.5)).unwrap();
+        
+        assert!(graph.has_node("F"));
+        assert_eq!(graph.edge_weight("F", "A"), Some(3.0));
+        assert_eq!(graph.edge_weight("B", "F"), Some(1.5));
+        
+        // Remove a node and ensure its edges are gone
+        let initial_node_count = graph.node_count();
+        graph.remove_node("F").unwrap();
+        
+        assert_eq!(graph.node_count(), initial_node_count - 1);
+        assert!(!graph.has_node("F"));
+        assert!(graph.edge_weight("F", "A").is_none());
+        assert!(graph.edge_weight("B", "F").is_none());
+    }
+
+    #[test]
+    fn test_vectorized_pagerank() {
+        let graph = create_test_graph();
+        let algorithm = VectorizedPageRank;
+        
+        let params = AlgorithmParams::new()
+            .with_param("damping_factor", 0.85)
+            .with_param("max_iterations", 50)
+            .with_param("tolerance", 1e-6);
+        
+        let result = algorithm.execute(&graph, &params).unwrap();
+        
+        assert_eq!(result.num_rows(), graph.node_count());
+        assert_eq!(result.num_columns(), 2);
+        
+        let node_col = result.column(0).as_any().downcast_ref::<StringArray>().unwrap();
+        let score_col = result.column(1).as_any().downcast_ref::<Float64Array>().unwrap();
+        
+        // Verify PageRank properties
+        let mut total_score = 0.0;
+        let mut found_nodes = std::collections::HashSet::new();
+        
+        for i in 0..result.num_rows() {
+            let node_id = node_col.value(i);
+            let score = score_col.value(i);
+            
+            found_nodes.insert(node_id);
+            total_score += score;
+            
+            // PageRank scores should be positive
+            assert!(score > 0.0, "PageRank score should be positive: {}", score);
+        }
+        
+        // Check that we have all expected nodes
+        assert!(found_nodes.contains("A"));
+        assert!(found_nodes.contains("B"));
+        assert!(found_nodes.contains("C"));
+        assert!(found_nodes.contains("D"));
+        assert!(found_nodes.contains("E"));
+        
+        // PageRank scores should sum to approximately 1.0
+        assert!((total_score - 1.0).abs() < 1e-8, "PageRank scores should sum to 1.0, got: {}", total_score);
+    }
+
+    #[test]
+    fn test_vectorized_batch_centralities() {
+        let graph = create_test_graph();
+        let algorithm = VectorizedBatchOperations;
+        
+        let params = AlgorithmParams::new();
+        let result = algorithm.execute(&graph, &params).unwrap();
+        
+        assert_eq!(result.num_rows(), graph.node_count());
+        assert_eq!(result.num_columns(), 4);
+        
+        let node_col = result.column(0).as_any().downcast_ref::<StringArray>().unwrap();
+        let degree_col = result.column(1).as_any().downcast_ref::<Float64Array>().unwrap();
+        let eigenvector_col = result.column(2).as_any().downcast_ref::<Float64Array>().unwrap();
+        let closeness_col = result.column(3).as_any().downcast_ref::<Float64Array>().unwrap();
+        
+        // Verify all centrality measures are computed
+        let mut found_nodes = std::collections::HashSet::new();
+        
+        for i in 0..result.num_rows() {
+            let node_id = node_col.value(i);
+            let degree_centrality = degree_col.value(i);
+            let eigenvector_centrality = eigenvector_col.value(i);
+            let closeness_centrality = closeness_col.value(i);
+            
+            found_nodes.insert(node_id);
+            
+            // All centrality measures should be non-negative and <= 1.0
+            assert!(degree_centrality >= 0.0 && degree_centrality <= 1.0, 
+                "Degree centrality should be in [0,1]: {}", degree_centrality);
+            assert!(eigenvector_centrality >= 0.0, 
+                "Eigenvector centrality should be non-negative: {}", eigenvector_centrality);
+            assert!(closeness_centrality >= 0.0 && closeness_centrality <= 1.0, 
+                "Closeness centrality should be in [0,1]: {}", closeness_centrality);
+        }
+        
+        // Check that we have all expected nodes
+        assert!(found_nodes.contains("A"));
+        assert!(found_nodes.contains("B"));
+        assert!(found_nodes.contains("C"));
+        assert!(found_nodes.contains("D"));
+        assert!(found_nodes.contains("E"));
+    }
+
+    #[test]
+    fn test_vectorized_vs_regular_pagerank_consistency() {
+        let graph = create_test_graph();
+        
+        let params = AlgorithmParams::new()
+            .with_param("damping_factor", 0.85)
+            .with_param("max_iterations", 100)
+            .with_param("tolerance", 1e-8);
+        
+        // Regular PageRank
+        let regular_pagerank = PageRank;
+        let regular_result = regular_pagerank.execute(&graph, &params).unwrap();
+        
+        // Vectorized PageRank
+        let vectorized_pagerank = VectorizedPageRank;
+        let vectorized_result = vectorized_pagerank.execute(&graph, &params).unwrap();
+        
+        // Results should be similar (allowing for small numerical differences)
+        assert_eq!(regular_result.num_rows(), vectorized_result.num_rows());
+        
+        let regular_scores = regular_result.column(1).as_any().downcast_ref::<Float64Array>().unwrap();
+        let vectorized_scores = vectorized_result.column(1).as_any().downcast_ref::<Float64Array>().unwrap();
+        
+        for i in 0..regular_result.num_rows() {
+            let regular_score = regular_scores.value(i);
+            let vectorized_score = vectorized_scores.value(i);
+            let diff = (regular_score - vectorized_score).abs();
+            
+            assert!(diff < 1e-6, 
+                "PageRank scores should be similar: regular={}, vectorized={}, diff={}", 
+                regular_score, vectorized_score, diff);
+        }
+    }
+
+    #[test]
+    fn test_random_walk() {
+        let graph = create_test_graph();
+        let algorithm = RandomWalk;
+        
+        let params = AlgorithmParams::new()
+            .with_param("walk_length", 5)
+            .with_param("num_walks", 3)
+            .with_param("seed", 42u64);
+        
+        let result = algorithm.execute(&graph, &params).unwrap();
+        
+        // Check basic structure
+        assert_eq!(result.num_columns(), 3);
+        
+        let walk_id_col = result.column(0).as_any().downcast_ref::<UInt32Array>().unwrap();
+        let step_col = result.column(1).as_any().downcast_ref::<UInt32Array>().unwrap();
+        let node_col = result.column(2).as_any().downcast_ref::<StringArray>().unwrap();
+        
+        // Verify walks structure
+        let mut walks: std::collections::HashMap<u32, Vec<(u32, String)>> = std::collections::HashMap::new();
+        
+        for i in 0..result.num_rows() {
+            let walk_id = walk_id_col.value(i);
+            let step = step_col.value(i);
+            let node_id = node_col.value(i).to_string();
+            
+            walks.entry(walk_id).or_insert_with(Vec::new).push((step, node_id));
+        }
+        
+        // Should have walks from each node (5 nodes * 3 walks each = 15 total walks)
+        assert_eq!(walks.len(), 15);
+        
+        // Each walk should have valid steps
+        for (_, walk_steps) in walks {
+            assert!(!walk_steps.is_empty());
+            assert!(walk_steps.len() <= 5); // walk_length parameter
+            
+            // Steps should be sequential starting from 0
+            let mut sorted_steps = walk_steps;
+            sorted_steps.sort_by_key(|(step, _)| *step);
+            
+            for (i, (step, _)) in sorted_steps.iter().enumerate() {
+                assert_eq!(*step, i as u32);
+            }
+        }
+    }
+    
+    #[test]
+    fn test_node2vec_walk() {
+        let graph = create_test_graph();
+        let algorithm = Node2VecWalk;
+        
+        let params = AlgorithmParams::new()
+            .with_param("walk_length", 10)
+            .with_param("num_walks", 2)
+            .with_param("p", 1.0)
+            .with_param("q", 1.0)
+            .with_param("seed", 42u64);
+        
+        let result = algorithm.execute(&graph, &params).unwrap();
+        
+        // Check basic structure
+        assert_eq!(result.num_columns(), 5);
+        
+        let walk_id_col = result.column(0).as_any().downcast_ref::<UInt32Array>().unwrap();
+        let step_col = result.column(1).as_any().downcast_ref::<UInt32Array>().unwrap();
+        let node_col = result.column(2).as_any().downcast_ref::<StringArray>().unwrap();
+        let p_col = result.column(3).as_any().downcast_ref::<Float64Array>().unwrap();
+        let q_col = result.column(4).as_any().downcast_ref::<Float64Array>().unwrap();
+        
+        // Verify Node2Vec parameters are preserved
+        for i in 0..result.num_rows() {
+            assert_eq!(p_col.value(i), 1.0);
+            assert_eq!(q_col.value(i), 1.0);
+        }
+        
+        // Should have walks from each node
+        let walk_count = walk_id_col.iter().max().unwrap().unwrap() + 1;
+        assert_eq!(walk_count, 10); // 5 nodes * 2 walks each
+    }
+    
+    #[test]
+    fn test_graph_sampling_random_node() {
+        let graph = create_test_graph();
+        let algorithm = GraphSampling;
+        
+        let params = AlgorithmParams::new()
+            .with_param("method", "random_node".to_string())
+            .with_param("sample_size", 3)
+            .with_param("seed", 42u64);
+        
+        let result = algorithm.execute(&graph, &params).unwrap();
+        
+        assert_eq!(result.num_columns(), 1);
+        assert_eq!(result.num_rows(), 3);
+        
+        let node_col = result.column(0).as_any().downcast_ref::<StringArray>().unwrap();
+        
+        // Verify all sampled nodes exist in original graph
+        for i in 0..result.num_rows() {
+            let node_id = node_col.value(i);
+            assert!(graph.has_node(node_id), "Sampled node {} should exist in graph", node_id);
+        }
+    }
+    
+    #[test]
+    fn test_graph_sampling_random_edge() {
+        let graph = create_test_graph();
+        let algorithm = GraphSampling;
+        
+        let params = AlgorithmParams::new()
+            .with_param("method", "random_edge".to_string())
+            .with_param("sample_ratio", 0.6)
+            .with_param("seed", 42u64);
+        
+        let result = algorithm.execute(&graph, &params).unwrap();
+        
+        assert_eq!(result.num_columns(), 3);
+        
+        let source_col = result.column(0).as_any().downcast_ref::<StringArray>().unwrap();
+        let target_col = result.column(1).as_any().downcast_ref::<StringArray>().unwrap();
+        let weight_col = result.column(2).as_any().downcast_ref::<Float64Array>().unwrap();
+        
+        // Verify all sampled edges exist in original graph
+        for i in 0..result.num_rows() {
+            let source = source_col.value(i);
+            let target = target_col.value(i);
+            let weight = weight_col.value(i);
+            
+            assert!(graph.has_node(source), "Source node {} should exist", source);
+            assert!(graph.has_node(target), "Target node {} should exist", target);
+            assert!(graph.edge_weight(source, target).is_some(), 
+                "Edge {}→{} should exist in graph", source, target);
+            assert!(weight > 0.0, "Edge weight should be positive");
+        }
+    }
+    
+    #[test]
+    fn test_graph_sampling_snowball() {
+        let graph = create_test_graph();
+        let algorithm = GraphSampling;
+        
+        let params = AlgorithmParams::new()
+            .with_param("method", "snowball".to_string())
+            .with_param("seed_nodes", vec!["A".to_string()])
+            .with_param("k_hops", 2)
+            .with_param("max_nodes", 4);
+        
+        let result = algorithm.execute(&graph, &params).unwrap();
+        
+        assert_eq!(result.num_columns(), 1);
+        assert!(result.num_rows() <= 4); // Respects max_nodes
+        
+        let node_col = result.column(0).as_any().downcast_ref::<StringArray>().unwrap();
+        
+        // Should include the seed node
+        let sampled_nodes: Vec<String> = (0..result.num_rows())
+            .map(|i| node_col.value(i).to_string())
+            .collect();
+        
+        assert!(sampled_nodes.contains(&"A".to_string()), 
+            "Snowball sampling should include seed node A");
+        
+        // All sampled nodes should exist in graph
+        for node_id in &sampled_nodes {
+            assert!(graph.has_node(node_id), "Sampled node {} should exist in graph", node_id);
+        }
+    }
+    
+    #[test]
+    fn test_sampling_invalid_parameters() {
+        let graph = create_test_graph();
+        
+        // Test RandomWalk with invalid walk_length
+        let algorithm = RandomWalk;
+        let params = AlgorithmParams::new().with_param("walk_length", 0);
+        let result = algorithm.execute(&graph, &params);
+        assert!(result.is_err());
+        
+        // Test Node2VecWalk with invalid p parameter
+        let algorithm = Node2VecWalk;
+        let params = AlgorithmParams::new().with_param("p", -1.0);
+        let result = algorithm.execute(&graph, &params);
+        assert!(result.is_err());
+        
+        // Test GraphSampling with invalid sample_ratio
+        let algorithm = GraphSampling;
+        let params = AlgorithmParams::new()
+            .with_param("method", "random_edge".to_string())
+            .with_param("sample_ratio", 1.5);
+        let result = algorithm.execute(&graph, &params);
+        assert!(result.is_err());
+    }
+    
+    #[test]
+    fn test_sampling_algorithm_names() {
+        let random_walk = RandomWalk;
+        let node2vec = Node2VecWalk;
+        let sampling = GraphSampling;
+        
+        assert_eq!(random_walk.name(), "random_walk");
+        assert_eq!(node2vec.name(), "node2vec");
+        assert_eq!(sampling.name(), "graph_sampling");
+        
+        // Check descriptions
+        assert!(!random_walk.description().is_empty());
+        assert!(!node2vec.description().is_empty());
+        assert!(!sampling.description().is_empty());
+    }
+
+    #[test]
+    fn test_streaming_graph_processor_basic_operations() {
+        let initial_graph = create_test_graph();
+        let mut processor = StreamingGraphProcessor::new(initial_graph);
+        
+        let initial_node_count = processor.graph().node_count();
+        let initial_edge_count = processor.graph().edge_count();
+        
+        // Test adding a node
+        let result = processor.apply_update(StreamUpdate::AddNode { 
+            node_id: "F".to_string() 
+        }).unwrap();
+        
+        assert_eq!(result.operation, "add_node");
+        assert_eq!(result.nodes_added, 1);
+        assert_eq!(result.nodes_removed, 0);
+        assert_eq!(processor.graph().node_count(), initial_node_count + 1);
+        assert!(processor.graph().has_node("F"));
+        
+        // Test adding an edge
+        let result = processor.apply_update(StreamUpdate::AddEdge { 
+            source: "F".to_string(),
+            target: "A".to_string(),
+            weight: Some(2.0),
+        }).unwrap();
+        
+        assert_eq!(result.operation, "add_edge");
+        assert_eq!(result.edges_added, 1);
+        assert_eq!(processor.graph().edge_count(), initial_edge_count + 1);
+        assert_eq!(processor.graph().edge_weight("F", "A"), Some(2.0));
+        
+        // Test removing an edge
+        let result = processor.apply_update(StreamUpdate::RemoveEdge { 
+            source: "F".to_string(),
+            target: "A".to_string(),
+        }).unwrap();
+        
+        assert_eq!(result.operation, "remove_edge");
+        assert_eq!(result.edges_removed, 1);
+        assert_eq!(processor.graph().edge_count(), initial_edge_count);
+        assert!(processor.graph().edge_weight("F", "A").is_none());
+        
+        // Test removing a node
+        let result = processor.apply_update(StreamUpdate::RemoveNode { 
+            node_id: "F".to_string() 
+        }).unwrap();
+        
+        assert_eq!(result.operation, "remove_node");
+        assert_eq!(result.nodes_removed, 1);
+        assert_eq!(processor.graph().node_count(), initial_node_count);
+        assert!(!processor.graph().has_node("F"));
+    }
+    
+    #[test]
+    fn test_streaming_graph_processor_empty_graph() {
+        let mut processor = StreamingGraphProcessor::empty().unwrap();
+        
+        assert_eq!(processor.graph().node_count(), 0);
+        assert_eq!(processor.graph().edge_count(), 0);
+        
+        // Add first node
+        processor.apply_update(StreamUpdate::AddNode { 
+            node_id: "A".to_string() 
+        }).unwrap();
+        
+        assert_eq!(processor.graph().node_count(), 1);
+        assert!(processor.graph().has_node("A"));
+        
+        // Add second node and edge
+        processor.apply_update(StreamUpdate::AddNode { 
+            node_id: "B".to_string() 
+        }).unwrap();
+        
+        processor.apply_update(StreamUpdate::AddEdge { 
+            source: "A".to_string(),
+            target: "B".to_string(),
+            weight: Some(1.0),
+        }).unwrap();
+        
+        assert_eq!(processor.graph().node_count(), 2);
+        assert_eq!(processor.graph().edge_count(), 1);
+        assert_eq!(processor.graph().edge_weight("A", "B"), Some(1.0));
+    }
+    
+    #[test]
+    fn test_streaming_graph_processor_batch_operations() {
+        let initial_graph = create_test_graph();
+        let mut processor = StreamingGraphProcessor::new(initial_graph);
+        
+        let batch_operations = vec![
+            StreamUpdate::AddNode { node_id: "F".to_string() },
+            StreamUpdate::AddNode { node_id: "G".to_string() },
+            StreamUpdate::AddEdge { 
+                source: "F".to_string(),
+                target: "G".to_string(),
+                weight: Some(1.5),
+            },
+        ];
+        
+        let result = processor.apply_update(StreamUpdate::Batch { 
+            operations: batch_operations 
+        }).unwrap();
+        
+        assert_eq!(result.operation, "batch");
+        assert_eq!(result.nodes_added, 2);
+        assert_eq!(result.edges_added, 1);
+        
+        assert!(processor.graph().has_node("F"));
+        assert!(processor.graph().has_node("G"));
+        assert_eq!(processor.graph().edge_weight("F", "G"), Some(1.5));
+    }
+    
+    #[test]
+    fn test_streaming_graph_processor_change_log() {
+        let initial_graph = create_test_graph();
+        let mut processor = StreamingGraphProcessor::new(initial_graph);
+        
+        // Enable change logging
+        processor.set_change_log_enabled(true);
+        
+        // Apply some updates
+        processor.apply_update(StreamUpdate::AddNode { 
+            node_id: "F".to_string() 
+        }).unwrap();
+        
+        processor.apply_update(StreamUpdate::AddEdge { 
+            source: "F".to_string(),
+            target: "A".to_string(),
+            weight: Some(2.0),
+        }).unwrap();
+        
+        // Check change log
+        let change_log = processor.get_change_log_since(0);
+        assert_eq!(change_log.len(), 2);
+        
+        // Check statistics
+        let stats = processor.get_statistics();
+        assert_eq!(stats.total_updates, 2);
+        assert_eq!(stats.change_log_size, 2);
+        assert!(stats.change_log_enabled);
+        
+        // Test compaction
+        processor.compact_change_log(1);
+        let change_log_after_compact = processor.get_change_log_since(0);
+        assert_eq!(change_log_after_compact.len(), 1);
+    }
+    
+    #[test]
+    fn test_streaming_graph_processor_snapshots() {
+        let initial_graph = create_test_graph();
+        let mut processor = StreamingGraphProcessor::new(initial_graph);
+        
+        let initial_node_count = processor.graph().node_count();
+        
+        // Create snapshot
+        let snapshot = processor.create_snapshot().unwrap();
+        assert_eq!(snapshot.update_count, 0);
+        assert_eq!(snapshot.graph.node_count(), initial_node_count);
+        
+        // Make some changes
+        processor.apply_update(StreamUpdate::AddNode { 
+            node_id: "F".to_string() 
+        }).unwrap();
+        processor.apply_update(StreamUpdate::AddNode { 
+            node_id: "G".to_string() 
+        }).unwrap();
+        
+        assert_eq!(processor.graph().node_count(), initial_node_count + 2);
+        assert_eq!(processor.update_count(), 2);
+        
+        // Restore from snapshot
+        processor.restore_from_snapshot(snapshot);
+        
+        assert_eq!(processor.graph().node_count(), initial_node_count);
+        assert_eq!(processor.update_count(), 0);
+        assert!(!processor.graph().has_node("F"));
+        assert!(!processor.graph().has_node("G"));
+    }
+    
+    #[test]
+    fn test_streaming_graph_system_with_cache() {
+        let initial_graph = create_test_graph();
+        let mut system = StreamingGraphSystem::new(initial_graph);
+        
+        // Test basic operations work
+        let result = system.apply_update_with_cache_invalidation(StreamUpdate::AddNode { 
+            node_id: "F".to_string() 
+        }).unwrap();
+        
+        assert_eq!(result.operation, "add_node");
+        assert!(system.graph_processor().graph().has_node("F"));
+        
+        // Test cache statistics
+        let cache_stats = system.algorithm_processor().get_cache_statistics();
+        assert_eq!(cache_stats.cached_algorithms, 0); // No algorithms cached yet
+        
+        // Test algorithm processor methods
+        assert!(!system.algorithm_processor().is_cache_valid("pagerank", 100));
+        system.algorithm_processor_mut().set_invalidation_threshold(20);
+        
+        let cache_stats_after = system.algorithm_processor().get_cache_statistics();
+        assert_eq!(cache_stats_after.invalidation_threshold, 20);
+    }
+    
+    #[test]
+    fn test_streaming_update_result_conversion() {
+        let initial_graph = create_test_graph();
+        let mut processor = StreamingGraphProcessor::new(initial_graph);
+        
+        let result = processor.apply_update(StreamUpdate::AddNode { 
+            node_id: "F".to_string() 
+        }).unwrap();
+        
+        // Test conversion to RecordBatch
+        let record_batch = result.to_record_batch().unwrap();
+        assert_eq!(record_batch.num_rows(), 1);
+        assert_eq!(record_batch.num_columns(), 6);
+        
+        let operation_col = record_batch.column(0).as_any().downcast_ref::<StringArray>().unwrap();
+        assert_eq!(operation_col.value(0), "add_node");
+        
+        let nodes_added_col = record_batch.column(1).as_any().downcast_ref::<UInt64Array>().unwrap();
+        assert_eq!(nodes_added_col.value(0), 1);
+    }
+    
+    #[test]
+    fn test_streaming_graph_system_empty() {
+        let mut system = StreamingGraphSystem::empty().unwrap();
+        
+        assert_eq!(system.graph_processor().graph().node_count(), 0);
+        assert_eq!(system.graph_processor().graph().edge_count(), 0);
+        
+        // Build a small graph through streaming updates
+        system.apply_update_with_cache_invalidation(StreamUpdate::AddNode { 
+            node_id: "A".to_string() 
+        }).unwrap();
+        
+        system.apply_update_with_cache_invalidation(StreamUpdate::AddNode { 
+            node_id: "B".to_string() 
+        }).unwrap();
+        
+        system.apply_update_with_cache_invalidation(StreamUpdate::AddEdge { 
+            source: "A".to_string(),
+            target: "B".to_string(),
+            weight: Some(1.0),
+        }).unwrap();
+        
+        assert_eq!(system.graph_processor().graph().node_count(), 2);
+        assert_eq!(system.graph_processor().graph().edge_count(), 1);
+        assert!(system.graph_processor().graph().has_node("A"));
+        assert!(system.graph_processor().graph().has_node("B"));
+        assert_eq!(system.graph_processor().graph().edge_weight("A", "B"), Some(1.0));
+    }
+    
+    #[test]
+    fn test_streaming_invalid_operations() {
+        let initial_graph = create_test_graph();
+        let mut processor = StreamingGraphProcessor::new(initial_graph);
+        
+        // Try to remove non-existent node
+        let result = processor.apply_update(StreamUpdate::RemoveNode { 
+            node_id: "Z".to_string() 
+        });
+        assert!(result.is_err());
+        
+        // Try to remove non-existent edge
+        let result = processor.apply_update(StreamUpdate::RemoveEdge { 
+            source: "A".to_string(),
+            target: "Z".to_string(),
+        });
+        assert!(result.is_err());
+        
+        // Try to add duplicate edge
+        let result = processor.apply_update(StreamUpdate::AddEdge { 
+            source: "A".to_string(),
+            target: "B".to_string(),
+            weight: Some(2.0),
+        });
+        assert!(result.is_err()); // Should fail because A->B already exists
     }
 }

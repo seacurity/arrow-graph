@@ -36,6 +36,9 @@ pub enum GraphError {
     
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
+    
+    #[error("Computation error: {0}")]
+    Computation(String),
 }
 
 impl GraphError {
@@ -57,5 +60,9 @@ impl GraphError {
     
     pub fn node_not_found<S: Into<String>>(node_id: S) -> Self {
         GraphError::NodeNotFound(node_id.into())
+    }
+    
+    pub fn computation_error<S: Into<String>>(msg: S) -> Self {
+        GraphError::Computation(msg.into())
     }
 }

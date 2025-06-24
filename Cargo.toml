@@ -1,6 +1,6 @@
 [package]
 name = "arrow-graph"
-version = "0.2.1"
+version = "0.2.0"
 edition = "2021"
 authors = ["Mike Saxton <mike@seacurity.io>"]
 description = "Arrow-native graph processing engine with SQL interface"
@@ -46,6 +46,10 @@ indexmap = "2.0"
 
 # Numeric computations
 num-traits = "0.2"
+
+# Random number generation for sampling
+rand = "0.8"
+rand_pcg = "0.3"
 
 [dev-dependencies]
 criterion = { version = "0.6.0", features = ["html_reports"] }
