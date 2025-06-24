@@ -7,7 +7,7 @@ pub mod streaming;
 pub use graph::{ArrowGraph, GraphIndexes, StreamingGraphProcessor, StreamingGraphSystem, StreamUpdate, UpdateResult, IncrementalAlgorithmProcessor};
 pub use sql::GraphSqlExtension;
 pub use algorithms::{GraphAlgorithm, AlgorithmParams};
-pub use streaming::{IncrementalGraphProcessor, UpdateOperation, StreamingAlgorithm, StreamingPageRank, StreamingConnectedComponents, GraphChangeDetector, AnomalyEvent, AnomalyType};
+pub use streaming::{IncrementalGraphProcessor, UpdateOperation, StreamingAlgorithm, StreamingPageRank, StreamingConnectedComponents, GraphChangeDetector, AnomalyEvent, AnomalyType, SlidingWindowProcessor, EventDrivenProcessor, ApproximateGraphProcessor, GraphSamplingProcessor};
 pub use algorithms::components::{WeaklyConnectedComponents, StronglyConnectedComponents};
 pub use algorithms::community::LeidenCommunityDetection;
 pub use algorithms::aggregation::{TriangleCount, ClusteringCoefficient};
@@ -20,7 +20,7 @@ pub mod prelude {
     pub use crate::graph::{ArrowGraph, GraphIndexes, StreamingGraphProcessor, StreamingGraphSystem, StreamUpdate, UpdateResult, IncrementalAlgorithmProcessor};
     pub use crate::sql::GraphSqlExtension;
     pub use crate::algorithms::{GraphAlgorithm, AlgorithmParams};
-    pub use crate::streaming::{IncrementalGraphProcessor, UpdateOperation, StreamingAlgorithm, StreamingPageRank, StreamingConnectedComponents, GraphChangeDetector, AnomalyEvent, AnomalyType};
+    pub use crate::streaming::{IncrementalGraphProcessor, UpdateOperation, StreamingAlgorithm, StreamingPageRank, StreamingConnectedComponents, GraphChangeDetector, AnomalyEvent, AnomalyType, SlidingWindowProcessor, EventDrivenProcessor, ApproximateGraphProcessor, GraphSamplingProcessor};
     pub use crate::algorithms::components::{WeaklyConnectedComponents, StronglyConnectedComponents};
     pub use crate::algorithms::community::LeidenCommunityDetection;
     pub use crate::algorithms::aggregation::{TriangleCount, ClusteringCoefficient};
