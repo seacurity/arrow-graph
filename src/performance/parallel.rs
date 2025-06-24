@@ -71,7 +71,6 @@ pub struct LoadBalancer {
 }
 
 /// Work item for parallel processing
-#[derive(Debug)]
 pub struct WorkItem {
     pub task_id: usize,
     pub task_type: TaskType,
@@ -92,13 +91,12 @@ pub enum TaskType {
 }
 
 /// Task data payload
-#[derive(Debug)]
 pub enum TaskData {
     NodeRange(usize, usize),              // start, end indices
     EdgeRange(usize, usize),              // start, end indices
     SubgraphNodes(Vec<String>),           // node IDs
     Algorithm(Box<dyn GraphAlgorithm>, AlgorithmParams),
-    Computation(Box<dyn ParallelComputation>),
+    // Computation(Box<dyn ParallelComputation>), // Commented out due to trait object issues
 }
 
 /// Task priority levels
