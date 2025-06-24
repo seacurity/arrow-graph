@@ -54,4 +54,8 @@ impl GraphError {
     pub fn invalid_parameter<S: Into<String>>(msg: S) -> Self {
         GraphError::InvalidParameter(msg.into())
     }
+    
+    pub fn node_not_found<S: Into<String>>(node_id: S) -> Self {
+        GraphError::NodeNotFound(node_id.into())
+    }
 }
