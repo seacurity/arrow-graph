@@ -1,9 +1,9 @@
 [package]
 name = "arrow-graph"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 authors = ["Mike Saxton <mike@seacurity.io>"]
-description = "Arrow-native graph processing engine with SQL interface"
+description = "High-performance graph processing library with GPU acceleration and standard interfaces"
 license = "Apache-2.0"
 repository = "https://github.com/seacurity/arrow-graph"
 keywords = ["graph", "analytics", "arrow", "sql", "datafusion"]
