@@ -3,6 +3,9 @@ pub mod sql;
 pub mod algorithms;
 pub mod error;
 pub mod streaming;
+// TODO: Fix compilation errors in ML module
+// pub mod ml;
+pub mod performance;
 
 pub use graph::{ArrowGraph, GraphIndexes, StreamingGraphProcessor, StreamingGraphSystem, StreamUpdate, UpdateResult, IncrementalAlgorithmProcessor};
 pub use sql::GraphSqlExtension;
